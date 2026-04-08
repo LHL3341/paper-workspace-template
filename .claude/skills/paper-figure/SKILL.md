@@ -1,188 +1,280 @@
 ---
 name: paper-figure
-description: Generate publication-ready scientific figures for ML papers using matplotlib. Covers architecture diagrams, result tables, bar/line charts, ablation plots, and multi-panel layouts with colorblind-safe palettes.
-user-invocable: true
-allowed-tools:
-  - Read
-  - Write
-  - Bash
-argument-hint: "[figure_type] [data_source]"
-arguments: figure_type,data_source
+description: "Generate publication-quality figures and tables from experiment results. Use when user says \"画图\", \"作图\", \"generate figures\", \"paper figures\", or needs plots for a paper."
+argument-hint: [figure-plan-or-data-path]
+allowed-tools: Bash(*), Read, Write, Edit, Grep, Glob, Agent, mcp__codex__codex, mcp__codex__codex-reply
 ---
 
-# Paper Figure — Publication-Quality Scientific Visualization
+# Paper Figure: Publication-Quality Plots from Experiment Data
 
-## Overview
+Generate all figures and tables for a paper based on: **$ARGUMENTS**
 
-Generate publication-ready figures for ML/AI papers. Follows best practices from scientific visualization guidelines and top-venue formatting standards (NeurIPS, ICML, ICLR).
+## Scope: What This Skill Can and Cannot Do
 
-## When to Use
+| Category | Can auto-generate? | Examples |
+|----------|-------------------|----------|
+| **Data-driven plots** | ✅ Yes | Line plots (training curves), bar charts (method comparison), scatter plots, heatmaps, box/violin plots |
+| **Comparison tables** | ✅ Yes | LaTeX tables comparing prior bounds, method features, ablation results |
+| **Multi-panel figures** | ✅ Yes | Subfigure grids combining multiple plots (e.g., 3×3 dataset × method) |
+| **Architecture/pipeline diagrams** | ❌ No — manual | Model architecture, data flow diagrams, system overviews. At best can generate a rough TikZ skeleton, but **expect to draw these yourself** using tools like draw.io, Figma, or TikZ |
+| **Generated image grids** | ❌ No — manual | Grids of generated samples (e.g., GAN/diffusion outputs). These come from running your model, not from this skill |
+| **Photographs / screenshots** | ❌ No — manual | Real-world images, UI screenshots, qualitative examples |
 
-- Creating result comparison charts (bar, line, grouped)
-- Drawing architecture/pipeline diagrams
-- Building ablation study tables or heatmaps
-- Generating multi-panel figure layouts
-- Making figures for paper submission
+**In practice:** For a typical ML paper, this skill handles ~60% of figures (all data plots + tables). The remaining ~40% (hero figure, architecture diagram, qualitative results) need to be created manually and placed in `figures/` before running `/paper-write`. The skill will detect these as "existing figures" and preserve them.
 
-## Figure Design Principles
+## Constants
 
-1. **Every figure must have a clear, self-contained message.** A reader should understand the figure without reading the full paper.
-2. **Minimize chartjunk.** Remove gridlines, background shading, 3D effects, and unnecessary borders.
-3. **Use direct labeling** instead of legends when possible.
-4. **Remove top and right spines** for cleaner appearance.
-5. **All text must be readable at print size** — minimum 7pt font at final figure width.
-6. **Figure 1 is the most important.** It should convey the key idea or main result at a glance. Invest significant effort here.
+- **STYLE = `publication`** — Visual style preset. Options: `publication` (default, clean for print), `poster` (larger fonts), `slide` (bold colors)
+- **DPI = 300** — Output resolution
+- **FORMAT = `pdf`** — Output format. Options: `pdf` (vector, best for LaTeX), `png` (raster fallback)
+- **COLOR_PALETTE = `tab10`** — Default matplotlib color cycle. Options: `tab10`, `Set2`, `colorblind` (deuteranopia-safe)
+- **FONT_SIZE = 10** — Base font size (matches typical conference body text)
+- **FIG_DIR = `figures/`** — Output directory for generated figures
+- **REVIEWER_MODEL = `gpt-5.4`** — Model used via Codex MCP for figure quality review.
 
-## Figure Sizing (NeurIPS)
+## Inputs
 
-| Type | Width | Usage |
-|------|-------|-------|
-| Single column | 5.5 in (140 mm) | Most figures |
-| Full width | 7.1 in (180 mm) | Architecture diagrams, multi-panel |
+1. **PAPER_PLAN.md** — figure plan table (from `/paper-plan`)
+2. **Experiment data** — JSON files, CSV files, or screen logs in `figures/` or project root
+3. **Existing figures** — any manually created figures to preserve
 
-- Resolution: 300 DPI minimum for raster; prefer vector (PDF, SVG)
-- Always use `plt.savefig(..., bbox_inches='tight', dpi=300)`
+If no PAPER_PLAN.md exists, scan for data files and ask the user which figures to generate.
 
-## Colorblind-Safe Design
+## Workflow
 
-1. **Required palettes**: Use `tab10`, seaborn `colorblind`, Okabe-Ito, or viridis/cividis
-2. **Never rely on color alone** — combine with hatching, markers, or line styles
-3. **Avoid red-green** combinations; prefer blue-orange or blue-yellow
-4. Test with colorblind simulator before submission
+### Step 1: Read Figure Plan
 
-## Standard Figure Templates
+Parse the Figure Plan table from PAPER_PLAN.md:
 
-### Template 1: Result Comparison Bar Chart
+```markdown
+| ID | Type | Description | Data Source | Priority |
+|----|------|-------------|-------------|----------|
+| Fig 1 | Architecture | ... | manual | HIGH |
+| Fig 2 | Line plot | ... | figures/exp.json | HIGH |
+```
+
+Identify:
+- Which figures can be auto-generated from data
+- Which need manual creation (architecture diagrams, etc.)
+- Which are comparison tables (generate as LaTeX)
+
+### Step 2: Set Up Plotting Environment
+
+Create a shared style configuration script:
 
 ```python
+# paper_plot_style.py — shared across all figure scripts
 import matplotlib.pyplot as plt
-import numpy as np
-
-# NeurIPS style setup
-plt.rcParams.update({
-    'font.size': 9,
+import matplotlib
+matplotlib.rcParams.update({
+    'font.size': FONT_SIZE,
     'font.family': 'serif',
-    'axes.linewidth': 0.8,
+    'font.serif': ['Times New Roman', 'Times', 'DejaVu Serif'],
+    'axes.labelsize': FONT_SIZE,
+    'axes.titlesize': FONT_SIZE + 1,
+    'xtick.labelsize': FONT_SIZE - 1,
+    'ytick.labelsize': FONT_SIZE - 1,
+    'legend.fontsize': FONT_SIZE - 1,
+    'figure.dpi': DPI,
+    'savefig.dpi': DPI,
+    'savefig.bbox': 'tight',
+    'savefig.pad_inches': 0.05,
+    'axes.grid': False,
     'axes.spines.top': False,
     'axes.spines.right': False,
-    'figure.dpi': 300,
+    'text.usetex': False,  # set True if LaTeX is available
+    'mathtext.fontset': 'stix',
 })
 
-fig, ax = plt.subplots(figsize=(5.5, 3.0))
+# Color palette
+COLORS = plt.cm.tab10.colors  # or Set2, or colorblind-safe
 
-methods = ['Baseline', 'SFT', '+ Dedup', '+ Distill']
-acc = [75.73, 79.33, 77.91, 78.35]
-colors = ['#4e79a7', '#59a14f', '#e15759', '#f28e2b']  # colorblind-safe
+def save_fig(fig, name, fmt=FORMAT):
+    """Save figure to FIG_DIR with consistent naming."""
+    fig.savefig(f'{FIG_DIR}/{name}.{fmt}')
+    print(f'Saved: {FIG_DIR}/{name}.{fmt}')
+```
 
-bars = ax.bar(methods, acc, color=colors, width=0.6, edgecolor='white', linewidth=0.5)
+### Step 3: Auto-Select Figure Type
+
+Use this decision tree for data-driven figures (inspired by Imbad0202/academic-research-skills):
+
+| Data Pattern | Recommended Type | Size |
+|-------------|-----------------|------|
+| X=time/steps, Y=metric | Line plot | 0.48\textwidth |
+| Methods × 1 metric | Bar chart | 0.48\textwidth |
+| Methods × multiple metrics | Grouped bar / radar | 0.95\textwidth |
+| Two continuous variables | Scatter plot | 0.48\textwidth |
+| Matrix / grid values | Heatmap | 0.48\textwidth |
+| Distribution comparison | Box/violin plot | 0.48\textwidth |
+| Multi-dataset results | Multi-panel (subfigure) | 0.95\textwidth |
+| Prior work comparison | LaTeX table | — |
+
+### Step 4: Generate Each Figure
+
+For each figure in the plan, create a standalone Python script:
+
+**Line plots** (training curves, scaling):
+```python
+# gen_fig2_training_curves.py
+from paper_plot_style import *
+import json
+
+with open('figures/exp_results.json') as f:
+    data = json.load(f)
+
+fig, ax = plt.subplots(1, 1, figsize=(5, 3.5))
+ax.plot(data['steps'], data['fac_loss'], label='Factorized', color=COLORS[0])
+ax.plot(data['steps'], data['crf_loss'], label='CRF-LR', color=COLORS[1])
+ax.set_xlabel('Training Steps')
+ax.set_ylabel('Cross-Entropy Loss')
+ax.legend(frameon=False)
+save_fig(fig, 'fig2_training_curves')
+```
+
+**Bar charts** (comparison, ablation):
+```python
+fig, ax = plt.subplots(1, 1, figsize=(5, 3))
+methods = ['Baseline', 'Method A', 'Method B', 'Ours']
+values = [82.3, 85.1, 86.7, 89.2]
+bars = ax.bar(methods, values, color=[COLORS[i] for i in range(len(methods))])
 ax.set_ylabel('Accuracy (%)')
-ax.set_ylim(74, 81)
-
-# Direct labeling
-for bar, v in zip(bars, acc):
-    ax.text(bar.get_x() + bar.get_width()/2, v + 0.2, f'{v:.1f}',
-            ha='center', va='bottom', fontsize=8)
-
-plt.tight_layout()
-plt.savefig('figures/result_comparison.pdf', bbox_inches='tight', dpi=300)
+# Add value labels on bars
+for bar, val in zip(bars, values):
+    ax.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.3,
+            f'{val:.1f}', ha='center', va='bottom', fontsize=FONT_SIZE-1)
+save_fig(fig, 'fig3_comparison')
 ```
 
-### Template 2: Multi-Panel Ablation
-
-```python
-fig, axes = plt.subplots(1, 3, figsize=(7.1, 2.5), constrained_layout=True)
-
-for i, (ax, title) in enumerate(zip(axes, ['(A) Dedup Effect', '(B) Distill Effect', '(C) Combined'])):
-    ax.set_title(title, fontsize=9, fontweight='bold', loc='left')
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    # ... plot data ...
-
-plt.savefig('figures/ablation_panels.pdf', bbox_inches='tight', dpi=300)
+**Comparison tables** (LaTeX, for theory papers):
+```latex
+\begin{table}[t]
+\centering
+\caption{Comparison of estimation error bounds. $n$: sample size, $D$: ambient dim, $d$: latent dim, $K$: subspaces, $n_k$: modes.}
+\label{tab:bounds}
+\begin{tabular}{lccc}
+\toprule
+Method & Rate & Depends on $D$? & Multi-modal? \\
+\midrule
+\citet{MinimaxOkoAS23} & $n^{-s'/D}$ & Yes (curse) & No \\
+\citet{ScoreMatchingdistributionrecovery} & $n^{-2/d}$ & No & No \\
+\textbf{Ours} & $\sqrt{\sum n_k d_k / n}$ & No & Yes \\
+\bottomrule
+\end{tabular}
+\end{table}
 ```
 
-### Template 3: Architecture/Pipeline Diagram
+**Architecture/pipeline diagrams** (MANUAL — outside this skill's scope):
+- These require manual creation using draw.io, Figma, Keynote, or TikZ
+- This skill can generate a rough TikZ skeleton as a starting point, but **do not expect publication-quality results**
+- If the figure already exists in `figures/`, preserve it and generate only the LaTeX `\includegraphics` snippet
+- Flag as `[MANUAL]` in the figure plan and `latex_includes.tex`
 
-For architecture diagrams, prefer:
-1. **TikZ** in LaTeX for maximum control and vector quality
-2. **matplotlib patches + arrows** for quick prototyping
-3. **draw.io → export SVG** for complex diagrams
+### Step 5: Run All Scripts
 
-```python
-# Quick pipeline diagram with matplotlib
-fig, ax = plt.subplots(figsize=(7.1, 1.8))
-ax.axis('off')
-
-boxes = ['Diagnose', 'Plan', 'Generate', 'Verify', 'Train', 'Evaluate']
-colors = ['#4e79a7', '#4e79a7', '#59a14f', '#e15759', '#f28e2b', '#f28e2b']
-
-for i, (name, c) in enumerate(zip(boxes, colors)):
-    x = i * 1.15
-    rect = plt.Rectangle((x, 0.3), 1.0, 0.4, facecolor=c, alpha=0.8,
-                          edgecolor='white', linewidth=1.5, zorder=2)
-    ax.add_patch(rect)
-    ax.text(x + 0.5, 0.5, name, ha='center', va='center',
-            fontsize=8, color='white', fontweight='bold', zorder=3)
-    if i < len(boxes) - 1:
-        ax.annotate('', xy=(x + 1.1, 0.5), xytext=(x + 1.0, 0.5),
-                    arrowprops=dict(arrowstyle='->', color='gray', lw=1.5))
-
-ax.set_xlim(-0.2, len(boxes) * 1.15)
-ax.set_ylim(0, 1)
-plt.savefig('figures/pipeline.pdf', bbox_inches='tight', dpi=300)
+```bash
+# Run all figure generation scripts
+for script in gen_fig*.py; do
+    python "$script"
+done
 ```
 
-### Template 4: Subskill Gap Analysis (Horizontal Bar)
+Verify all output files exist and are non-empty.
 
-```python
-fig, ax = plt.subplots(figsize=(5.5, 2.5))
+### Step 6: Generate LaTeX Include Snippets
 
-skills = ['Material sel.', 'Physical prop.', 'Causation', 'Physical seq.']
-train_pct = [19.8, 0.5, 3.2, 15.4]
-error_pct = [31.2, 6.9, 4.6, 6.4]
+For each figure, output the LaTeX code to include it:
 
-y = np.arange(len(skills))
-h = 0.35
-ax.barh(y - h/2, train_pct, h, label='Train %', color='#4e79a7')
-ax.barh(y + h/2, error_pct, h, label='Error %', color='#e15759')
-ax.set_yticks(y)
-ax.set_yticklabels(skills)
-ax.set_xlabel('Proportion (%)')
-ax.legend(frameon=False, fontsize=8)
-ax.spines['top'].set_visible(False)
-ax.spines['right'].set_visible(False)
-
-plt.tight_layout()
-plt.savefig('figures/subskill_gap.pdf', bbox_inches='tight', dpi=300)
+```latex
+% === Fig 2: Training Curves ===
+\begin{figure}[t]
+    \centering
+    \includegraphics[width=0.48\textwidth]{figures/fig2_training_curves.pdf}
+    \caption{Training curves comparing factorized and CRF-LR denoising.}
+    \label{fig:training_curves}
+\end{figure}
 ```
 
-## Multi-Panel Layout Rules
+Save all snippets to `figures/latex_includes.tex` for easy copy-paste into the paper.
 
-1. Label panels with bold uppercase: **(A)**, **(B)**, **(C)** in top-left
-2. Use consistent axis scales across panels when comparing
-3. Share axes where appropriate (`sharey=True`)
-4. Maintain consistent font sizes and line widths across all panels
-5. Use `constrained_layout=True` for automatic spacing
+### Step 7: Figure Quality Review with REVIEWER_MODEL
 
-## Statistical Annotations
+Send figure descriptions and captions to GPT-5.4 for review:
 
-1. Show individual data points alongside summaries (strip + box plots)
-2. Always specify error bar type in caption: SEM, SD, or 95% CI
-3. Significance brackets: \* p<.05, \*\* p<.01, \*\*\* p<.001
-4. Never use bar charts for small-n data — use dot plots
+```
+mcp__codex__codex:
+  model: gpt-5.4
+  config: {"model_reasoning_effort": "xhigh"}
+  prompt: |
+    Review these figure/table plans for a [VENUE] submission.
 
-## Export Checklist
+    For each figure:
+    1. Is the caption informative and self-contained?
+    2. Does the figure type match the data being shown?
+    3. Is the comparison fair and clear?
+    4. Any missing baselines or ablations?
+    5. Would a different visualization be more effective?
 
-- [ ] Vector format (PDF) for all line art
-- [ ] Font embedded or converted to outlines
-- [ ] Axis labels include units: "Time (s)", "Accuracy (%)"
-- [ ] Caption fully explains all symbols and panels
-- [ ] Colors match between figure and caption/legend
-- [ ] Tested in grayscale
-- [ ] Readable at final print width
+    [list all figures with captions and descriptions]
+```
 
-## References
+### Step 8: Quality Checklist
 
-- Adapted from [AutoResearchClaw](https://github.com/aiming-lab/AutoResearchClaw) scientific-visualization skill
-- Adapted from [K-Dense-AI/claude-scientific-skills](https://github.com/K-Dense-AI/claude-scientific-skills)
-- Tufte, E. "The Visual Display of Quantitative Information" (2001)
+Before finishing, verify each figure (from pedrohcgs/claude-code-my-workflow):
+
+- [ ] Font size readable at printed paper size (not too small)
+- [ ] Colors distinguishable in grayscale (print-friendly)
+- [ ] **No title inside figures** — titles go only in LaTeX `\caption{}` (from pedrohcgs)
+- [ ] Legend does not overlap data
+- [ ] Axis labels have units where applicable
+- [ ] Axis labels are publication-quality (not variable names like `emp_rate`)
+- [ ] Figure width fits single column (0.48\textwidth) or full width (0.95\textwidth)
+- [ ] PDF output is vector (not rasterized text)
+- [ ] No matplotlib default title (remove `plt.title` for publications)
+- [ ] Serif font matches paper body text (Times / Computer Modern)
+- [ ] Colorblind-accessible (if using colorblind palette)
+
+## Output
+
+```
+figures/
+├── paper_plot_style.py          # shared style config
+├── gen_fig1_architecture.py     # per-figure scripts
+├── gen_fig2_training_curves.py
+├── gen_fig3_comparison.py
+├── fig1_architecture.pdf        # generated figures
+├── fig2_training_curves.pdf
+├── fig3_comparison.pdf
+├── latex_includes.tex           # LaTeX snippets for all figures
+└── TABLE_*.tex                  # standalone table LaTeX files
+```
+
+## Key Rules
+
+- **Every figure must be reproducible** — save the generation script alongside the output
+- **Do NOT hardcode data** — always read from JSON/CSV files
+- **Use vector format (PDF)** for all plots — PNG only as fallback
+- **No decorative elements** — no background colors, no 3D effects, no chart junk
+- **Consistent style across all figures** — same fonts, colors, line widths
+- **Colorblind-safe** — verify with https://davidmathlogic.com/colorblind/ if needed
+- **One script per figure** — easy to re-run individual figures when data changes
+- **No titles inside figures** — captions are in LaTeX only
+- **Comparison tables count as figures** — generate them as standalone .tex files
+
+## Figure Type Reference
+
+| Type | When to Use | Typical Size |
+|------|------------|--------------|
+| Line plot | Training curves, scaling trends | 0.48\textwidth |
+| Bar chart | Method comparison, ablation | 0.48\textwidth |
+| Grouped bar | Multi-metric comparison | 0.95\textwidth |
+| Scatter plot | Correlation analysis | 0.48\textwidth |
+| Heatmap | Attention, confusion matrix | 0.48\textwidth |
+| Box/violin | Distribution comparison | 0.48\textwidth |
+| Architecture | System overview | 0.95\textwidth |
+| Multi-panel | Combined results (subfigures) | 0.95\textwidth |
+| Comparison table | Prior bounds vs. ours (theory) | full width |
+
+## Acknowledgements
+
+Design pattern (type × style matrix) inspired by [baoyu-skills](https://github.com/jimliu/baoyu-skills). Publication style defaults and figure rules from [pedrohcgs/claude-code-my-workflow](https://github.com/pedrohcgs/claude-code-my-workflow). Visualization decision tree from [Imbad0202/academic-research-skills](https://github.com/Imbad0202/academic-research-skills).
