@@ -1,5 +1,6 @@
 \documentclass{article}
 
+\PassOptionsToPackage{numbers, compress}{natbib}
 \usepackage{neurips_2026}
 
 \usepackage[utf8]{inputenc}
@@ -42,8 +43,9 @@
 \input{sections/5_discussion}
 \input{sections/6_conclusion}
 
+\clearpage
 \bibliography{refs}
-\bibliographystyle{plainnat}
+\bibliographystyle{mybst}
 
 \appendix
 \input{sections/A_appendix}
