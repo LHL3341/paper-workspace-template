@@ -7,8 +7,14 @@
 mkdir my-project && cd my-project
 cp -r /mnt/dhwfile/raise/user/linhonglin/paper-workspace-template paper
 
-# 2. ⚠️ 重要：将 skills 移到项目根目录，否则 Claude Code 无法加载
-mv paper/.claude .claude
+# 2. ⚠️ 重要：将 skills 合并到项目根目录，否则 Claude Code 无法加载
+#    如果项目根目录已有 .claude/，用 cp -rn 合并（不覆盖已有文件）
+if [ -d .claude ]; then
+    cp -rn paper/.claude/* .claude/
+    rm -rf paper/.claude
+else
+    mv paper/.claude .claude
+fi
 
 # 3. 修改 paper/main.tex 的标题和内容
 # 4. 编译
