@@ -79,13 +79,12 @@ paper/
 │   ├── 2_related_work.tex
 │   ├── 3_method.tex
 │   ├── 4_experiments.tex
-│   ├── 5_discussion.tex
-│   ├── 6_conclusion.tex
+│   ├── 5_conclusion.tex
 │   └── A_appendix.tex          # proof details, extra experiments
 └── figures/                    # symlink or copy from project figures/
 ```
 
-**Section structure is FIXED at 6 sections**: Introduction, Related Work, Method, Experiments, Discussion, Conclusion. Do NOT create extra section files. If the paper has theory, ablations, or analysis, fold them into Method or Experiments as subsections.
+**Section structure is FIXED at 5 sections**: Introduction, Related Work, Method, Experiments, Conclusion. Do NOT create extra section files (no Discussion, Analysis, etc.). If the paper has theory, ablations, or analysis, fold them into Method or Experiments as subsections.
 
 ## Workflow
 
@@ -184,13 +183,7 @@ Before drafting the front matter, re-read the one-sentence contribution from `PA
 - For each major experiment, make explicit what claim it supports and what the reader should notice
 - Target: 2.5-3 pages
 
-**§5 Discussion:**
-- Broader implications of the results
-- Honest limitations (reviewers appreciate this)
-- Connections to related work and open problems
-- Target: 0.5-1 page
-
-**§6 Conclusion:**
+**§5 Conclusion:**
 - Summarize contributions (NOT copy-paste from intro — rephrase)
 - Limitations (be honest — reviewers appreciate this)
 - Future work (1-2 concrete directions)
@@ -357,7 +350,7 @@ Before declaring done:
 - **Venue style matters** — all three venues (ICLR/NeurIPS/ICML) use `natbib` (`\citep`/`\citet`)
 - **Page limit = main body to Conclusion** — references and appendix do NOT count
 - **Clean bib** — references.bib must only contain entries that are actually `\cite`d
-- **Section count is fixed at 6** — Introduction, Related Work, Method, Experiments, Discussion, Conclusion. Match this structure exactly.
+- **Section count is fixed at 5** — Introduction, Related Work, Method, Experiments, Conclusion. Match this structure exactly.
 - **Backup before overwrite** — never destroy existing `paper/` directory without backing up
 - **Front-load the contribution** — do not hide the payoff until the experiments or appendix
 

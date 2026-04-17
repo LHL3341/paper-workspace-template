@@ -70,18 +70,17 @@ Before committing to a structure, apply the narrative principle from `../shared-
 - By the end of the Introduction, the outline should make the **What**, **Why**, and **So What** explicit.
 - Front-load the most important material: title, abstract, introduction, and hero figure. Reviewers often form a judgment before reading the full method.
 
-**IMPORTANT**: Always use the following **6-section structure**. Do NOT add extra sections (no "Analysis", "Ablation", "Theory Part A/B", etc.). If the paper has theory, ablations, or analysis content, fold it into the Method or Experiment sections as subsections. The 6 standard sections are:
+**IMPORTANT**: Always use the following **5-section structure**. Do NOT add extra sections (no "Discussion", "Analysis", "Ablation", "Theory Part A/B", etc.). If the paper has theory, ablations, or analysis content, fold it into the Method or Experiment sections as subsections. The 5 standard sections are:
 
 ```
 1. Introduction (1.5 pages)
 2. Related Work (1 page)
-3. Method (2 pages)           — includes preliminaries, formulation, algorithm, proof sketches
-4. Experiments (2.5 pages)    — includes setup, main results, ablations, analysis
-5. Discussion (1 page)        — broader impact, limitations, connections to related work
-6. Conclusion (0.5 pages)
+3. Method (2.5 pages)         — includes preliminaries, formulation, algorithm, proof sketches
+4. Experiments (3 pages)      — includes setup, main results, ablations, analysis
+5. Conclusion (0.5 pages)     — includes limitations and future work
 ```
 
-The total page budget MUST sum to MAX_PAGES. Adjust per-section page allocation as needed, but keep exactly 6 sections.
+The total page budget MUST sum to MAX_PAGES. Adjust per-section page allocation as needed, but keep exactly 5 sections.
 
 For theory-heavy papers: put proof sketches in §3 Method, full proofs in Appendix; include a comparison table of prior bounds vs. this paper's bounds in §4 Experiments.
 
@@ -135,14 +134,9 @@ For each section, specify:
   - Table 1: [what it shows, which methods/baselines compared]
 - **Data source**: [which JSON files / experiment results]
 
-### §5 Discussion
-- **Broader implications**: [what does this result mean for the field]
-- **Limitations**: [honest assessment — reviewers value this]
-- **Connections**: [how findings relate to broader trends or open problems]
-- **Estimated length**: 1 page
-
-### §6 Conclusion
+### §5 Conclusion
 - **Restatement**: [contributions rephrased, not copy-pasted from intro]
+- **Limitations**: [honest assessment — reviewers value this]
 - **Future work**: [1-2 concrete directions]
 - **Estimated length**: 0.5 pages
 ```
@@ -258,7 +252,7 @@ Save the final outline to `PAPER_PLAN.md` in the project root:
 - **Claims-Evidence Matrix is the backbone** — every claim must map to evidence, every experiment must support a claim
 - **Front-load the story** — the outline should make the contribution clear in the title, abstract, introduction, and hero figure before the reader reaches the full method
 - **Figures need detailed descriptions** — especially the hero figure, which must clearly specify comparisons and visual expectations
-- **Section count is fixed at 6** — Introduction, Related Work, Method, Experiments, Discussion, Conclusion. Fold all content into these sections.
+- **Section count is fixed at 5** — Introduction, Related Work, Method, Experiments, Conclusion. Fold all content into these sections.
 
 ## Acknowledgements
 
